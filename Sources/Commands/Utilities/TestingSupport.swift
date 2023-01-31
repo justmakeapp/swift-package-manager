@@ -128,6 +128,15 @@ enum TestingSupport {
             let codecovProfile = buildParameters.buildPath.appending(components: "codecov", "default%m.profraw")
             env["LLVM_PROFILE_FILE"] = codecovProfile.pathString
         }
+
+        // Force the XCTest process to treat stderr as a TTY if it will be piped
+        // to a TTY in this (parent) process.
+        if env["XCTEST_ANSI_CONTROL_CODES_SUPPORTED"] == nil,
+           let stderrStream = stderrStream.stream as? LocalFileOutputByteStream,
+           TerminalController.isTTY(stderrStream) {
+            env["XCTEST_ANSI_CONTROL_CODES_SUPPORTED"] = "1"
+        }
+
         #if !os(macOS)
         #if os(Windows)
         if let location = toolchain.xctestPath {
