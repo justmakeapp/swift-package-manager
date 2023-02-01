@@ -120,6 +120,11 @@ struct TestToolOptions: ParsableArguments {
           inversion: .prefixedEnableDisable,
           help: "Enable code coverage")
     var enableCodeCoverage: Bool = false
+
+    @Flag(name: .customLong("color-diagnostics"),
+          inversion: .prefixedEnableDisable,
+          help: "Enable ANSI colors in diagnostics")
+    var colorDiagnostics: Bool?
 }
 
 /// Tests filtering specifier
@@ -158,6 +163,32 @@ public struct SwiftTestTool: SwiftCommand {
 
     @OptionGroup()
     var options: TestToolOptions
+
+    /// Additional environment variables to set before executing the test tool.
+    var additionalTestEnvironmentVariables: [String: String] {
+        var env: [String: String] = [:]
+
+        switch options.colorDiagnostics {
+        case .none:
+            if options.xUnitOutput != nil {
+                // If the user specified --xunit-output, the generated ANSI
+                // escape codes could conflict with the XML's structure, so
+                // explicitly disable them.
+                env["XCTEST_COLOR_DIAGNOSTICS_ENABLED"] = "0"
+            } else if env["XCTEST_COLOR_DIAGNOSTICS_ENABLED"] == nil,
+                      let stderrStream = stderrStream.stream as? LocalFileOutputByteStream,
+                      TerminalController.isTTY(stderrStream) {
+                // Force the XCTest process to emit color diagnostics if stderr
+                // in the parent process (this one) is a TTY.
+                env["XCTEST_COLOR_DIAGNOSTICS_ENABLED"] = "1"
+            }
+        case .some(let colorDiagnostics):
+            // Enable/disable color diagnostics explicitly.
+            env["XCTEST_COLOR_DIAGNOSTICS_ENABLED"] = colorDiagnostics ? "1" : "0"
+        }
+
+        return env
+    }
 
     public func run(_ swiftTool: SwiftTool) throws {
         do {
@@ -214,7 +245,8 @@ public struct SwiftTestTool: SwiftCommand {
                     in: testProducts,
                     swiftTool: swiftTool,
                     enableCodeCoverage: options.enableCodeCoverage,
-                    sanitizers: globalOptions.build.sanitizers
+                    sanitizers: globalOptions.build.sanitizers,
+                    additionalTestEnvironmentVariables: additionalTestEnvironmentVariables
                 )
                 let tests = try testSuites
                     .filteredTests(specifier: options.testCaseSpecifier)
@@ -232,7 +264,8 @@ public struct SwiftTestTool: SwiftCommand {
             let testEnv = try TestingSupport.constructTestEnvironment(
                 toolchain: toolchain,
                 buildParameters: buildParameters,
-                sanitizers: globalOptions.build.sanitizers
+                sanitizers: globalOptions.build.sanitizers,
+                additionalVariables: additionalTestEnvironmentVariables
             )
 
             let runner = TestRunner(
@@ -265,7 +298,8 @@ public struct SwiftTestTool: SwiftCommand {
                 in: testProducts,
                 swiftTool: swiftTool,
                 enableCodeCoverage: options.enableCodeCoverage,
-                sanitizers: globalOptions.build.sanitizers
+                sanitizers: globalOptions.build.sanitizers,
+                additionalTestEnvironmentVariables: additionalTestEnvironmentVariables
             )
             let tests = try testSuites
                 .filteredTests(specifier: options.testCaseSpecifier)
@@ -292,6 +326,7 @@ public struct SwiftTestTool: SwiftCommand {
                 numJobs: options.numberOfWorkers ?? ProcessInfo.processInfo.activeProcessorCount,
                 buildOptions: globalOptions.build,
                 buildParameters: buildParameters,
+                additionalTestEnvironmentVariables: additionalTestEnvironmentVariables,
                 shouldOutputSuccess: swiftTool.logLevel <= .info,
                 observabilityScope: swiftTool.observabilityScope
             )
@@ -728,6 +763,9 @@ final class ParallelTestRunner {
     private let buildOptions: BuildOptions
     private let buildParameters: BuildParameters
 
+    /// Additional environment variables to set before executing the test tool.
+    private let additionalTestEnvironmentVariables: [String: String]
+
     /// Number of tests to execute in parallel.
     private let numJobs: Int
 
@@ -744,6 +782,7 @@ final class ParallelTestRunner {
         numJobs: Int,
         buildOptions: BuildOptions,
         buildParameters: BuildParameters,
+        additionalTestEnvironmentVariables: [String: String],
         shouldOutputSuccess: Bool,
         observabilityScope: ObservabilityScope
     ) {
@@ -764,6 +803,7 @@ final class ParallelTestRunner {
 
         self.buildOptions = buildOptions
         self.buildParameters = buildParameters
+        self.additionalTestEnvironmentVariables = additionalTestEnvironmentVariables
 
         assert(numJobs > 0, "num jobs should be > 0")
     }
@@ -794,7 +834,8 @@ final class ParallelTestRunner {
         let testEnv = try TestingSupport.constructTestEnvironment(
             toolchain: self.toolchain,
             buildParameters: self.buildParameters,
-            sanitizers: self.buildOptions.sanitizers
+            sanitizers: self.buildOptions.sanitizers,
+            additionalVariables: self.additionalTestEnvironmentVariables
         )
 
         // Enqueue all the tests.

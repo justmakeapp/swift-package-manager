@@ -46,7 +46,13 @@ enum TestingSupport {
         throw InternalError("XCTestHelper binary not found.")
     }
 
-    static func getTestSuites(in testProducts: [BuiltTestProduct], swiftTool: SwiftTool, enableCodeCoverage: Bool, sanitizers: [Sanitizer]) throws -> [AbsolutePath: [TestSuite]] {
+    static func getTestSuites(
+        in testProducts: [BuiltTestProduct],
+        swiftTool: SwiftTool,
+        enableCodeCoverage: Bool,
+        sanitizers: [Sanitizer],
+        additionalTestEnvironmentVariables: [String: String] = [:]
+    ) throws -> [AbsolutePath: [TestSuite]] {
         let testSuitesByProduct = try testProducts
             .map {(
                 $0.bundlePath,
@@ -112,7 +118,8 @@ enum TestingSupport {
     static func constructTestEnvironment(
         toolchain: UserToolchain,
         buildParameters: BuildParameters,
-        sanitizers: [Sanitizer]
+        sanitizers: [Sanitizer],
+        additionalVariables: [String: String] = [:]
     ) throws -> EnvironmentVariables {
         var env = EnvironmentVariables.process()
 
@@ -127,14 +134,6 @@ enum TestingSupport {
             // the filter.
             let codecovProfile = buildParameters.buildPath.appending(components: "codecov", "default%m.profraw")
             env["LLVM_PROFILE_FILE"] = codecovProfile.pathString
-        }
-
-        // Force the XCTest process to treat stderr as a TTY if it will be piped
-        // to a TTY in this (parent) process.
-        if env["XCTEST_ANSI_CONTROL_CODES_SUPPORTED"] == nil,
-           let stderrStream = stderrStream.stream as? LocalFileOutputByteStream,
-           TerminalController.isTTY(stderrStream) {
-            env["XCTEST_ANSI_CONTROL_CODES_SUPPORTED"] = "1"
         }
 
         #if !os(macOS)
@@ -153,26 +152,29 @@ enum TestingSupport {
         // Pass this explicitly on Linux because XCTest started requiring it, rdar://103054033
         env["LD_LIBRARY_PATH"] = libraryPaths.joined(separator: ":")
         #endif
-        return env
         #else
-        // Fast path when no sanitizers are enabled.
         if sanitizers.isEmpty {
-            return env
+            // Fast path when no sanitizers are enabled.
+        } else {
+            // Get the runtime libraries.
+            var runtimes = try sanitizers.map({ sanitizer in
+                return try toolchain.runtimeLibrary(for: sanitizer).pathString
+            })
+
+            // Append any existing value to the front.
+            if let existingValue = env["DYLD_INSERT_LIBRARIES"], !existingValue.isEmpty {
+                runtimes.insert(existingValue, at: 0)
+            }
+
+            env["DYLD_INSERT_LIBRARIES"] = runtimes.joined(separator: ":")
         }
-
-        // Get the runtime libraries.
-        var runtimes = try sanitizers.map({ sanitizer in
-            return try toolchain.runtimeLibrary(for: sanitizer).pathString
-        })
-
-        // Append any existing value to the front.
-        if let existingValue = env["DYLD_INSERT_LIBRARIES"], !existingValue.isEmpty {
-            runtimes.insert(existingValue, at: 0)
-        }
-
-        env["DYLD_INSERT_LIBRARIES"] = runtimes.joined(separator: ":")
-        return env
         #endif
+
+        // If any additional envvars were passed by the caller, merge them into
+        // the result. If a conflict occurs, prefer caller-supplied overrides.
+        env.merge(additionalVariables, uniquingKeysWith: { _, rhs in rhs })
+
+        return env
     }
 }
 
