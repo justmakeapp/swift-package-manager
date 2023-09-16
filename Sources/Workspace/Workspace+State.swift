@@ -131,7 +131,20 @@ private struct WorkspaceStateStorage {
         }
 
         try self.fileSystem.withLock(on: self.path, type: .exclusive) {
-            let storage = V6(dependencies: dependencies, artifacts: artifacts)
+            let storage: Codable = try {
+                if !self.fileSystem.exists(self.path) {
+                    return V6(dependencies: dependencies, artifacts: artifacts)
+                }
+                let version = try decoder.decode(path: self.path, fileSystem: self.fileSystem, as: Version.self)
+                switch version.version {
+                case 5:
+                    return V5(dependencies: dependencies, artifacts: artifacts)
+                case 6:
+                    return V6(dependencies: dependencies, artifacts: artifacts)
+                default:
+                    throw StringError("unknown 'WorkspaceStateStorage' version '\(version.version)' at '\(self.path)'")
+                }
+            }()
 
             let data = try self.encoder.encode(storage)
             try self.fileSystem.writeIfChanged(path: self.path, data: data)
