@@ -18,7 +18,7 @@ import Foundation
 /// This represents a reference to a package containing its identity and location.
 public struct PackageReference {
     /// The kind of package reference.
-    public enum Kind: Hashable, CustomStringConvertible, Sendable {
+    public enum Kind: Hashable, CustomStringConvertible, Sendable, Codable {
         /// A root package.
         case root(AbsolutePath)
 
@@ -198,32 +198,5 @@ extension PackageReference {
 extension PackageReference: CustomStringConvertible {
     public var description: String {
         return "\(self.identity) \(self.kind)"
-    }
-}
-
-extension PackageReference.Kind: Encodable {
-    private enum CodingKeys: String, CodingKey {
-        case root, fileSystem, localSourceControl, remoteSourceControl, registry
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .root(let path):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .root)
-            try unkeyedContainer.encode(path)
-        case .fileSystem(let path):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .fileSystem)
-            try unkeyedContainer.encode(path)
-        case .localSourceControl(let path):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .localSourceControl)
-            try unkeyedContainer.encode(path)
-        case .remoteSourceControl(let url):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .remoteSourceControl)
-            try unkeyedContainer.encode(url)
-        case .registry:
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .registry)
-            try unkeyedContainer.encode(self.isRoot)
-        }
     }
 }
