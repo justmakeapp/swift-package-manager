@@ -17,8 +17,8 @@ import OrderedCollections
 import PackageLoading
 import PackageModel
 
-enum PackageGraphError: Swift.Error {
-    /// Indicates a non-root package with no modules.
+public enum PackageGraphError: Swift.Error {
+    /// Indicates a non-root package with no targets.
     case noModules(Package)
 
     /// The package dependency declaration has cycle in it.
