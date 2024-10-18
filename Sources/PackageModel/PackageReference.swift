@@ -201,9 +201,47 @@ extension PackageReference: CustomStringConvertible {
     }
 }
 
-extension PackageReference.Kind: Encodable {
-    private enum CodingKeys: String, CodingKey {
+extension PackageReference.Kind: Codable {
+    private enum CodingKeys: String, CodingKey, CaseIterable {
         case root, fileSystem, localSourceControl, remoteSourceControl, registry
+    }
+    
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        guard let key = container.allKeys.first else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "Invalid enum container: no keys found"
+            ))
+        }
+
+        switch key {
+        case .root:
+            var unkeyedContainer = try container.nestedUnkeyedContainer(forKey: .root)
+            let path = try unkeyedContainer.decode(AbsolutePath.self)
+            self = .root(path)
+
+        case .fileSystem:
+            var unkeyedContainer = try container.nestedUnkeyedContainer(forKey: .fileSystem)
+            let path = try unkeyedContainer.decode(AbsolutePath.self)
+            self = .fileSystem(path)
+
+        case .localSourceControl:
+            var unkeyedContainer = try container.nestedUnkeyedContainer(forKey: .localSourceControl)
+            let path = try unkeyedContainer.decode(AbsolutePath.self)
+            self = .localSourceControl(path)
+
+        case .remoteSourceControl:
+            var unkeyedContainer = try container.nestedUnkeyedContainer(forKey: .remoteSourceControl)
+            let url = try unkeyedContainer.decode(SourceControlURL.self)
+            self = .remoteSourceControl(url)
+
+        case .registry:
+            var unkeyedContainer = try container.nestedUnkeyedContainer(forKey: .registry)
+            let identity = try unkeyedContainer.decode(PackageIdentity.self)
+            self = .registry(identity)
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
