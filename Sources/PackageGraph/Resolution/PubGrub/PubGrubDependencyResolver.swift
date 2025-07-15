@@ -774,7 +774,7 @@ internal enum LogLocation: String {
 }
 
 public extension PubGrubDependencyResolver {
-    enum PubGrubError: Swift.Error, CustomStringConvertible {
+    public enum PubGrubError: Swift.Error, CustomStringConvertible {
         case _unresolvable(Incompatibility, [DependencyResolutionNode: [Incompatibility]])
         case unresolvable(String)
 

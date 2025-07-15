@@ -200,30 +200,3 @@ extension PackageReference: CustomStringConvertible {
         return "\(self.identity) \(self.kind)"
     }
 }
-
-extension PackageReference.Kind: Encodable {
-    private enum CodingKeys: String, CodingKey {
-        case root, fileSystem, localSourceControl, remoteSourceControl, registry
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .root(let path):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .root)
-            try unkeyedContainer.encode(path)
-        case .fileSystem(let path):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .fileSystem)
-            try unkeyedContainer.encode(path)
-        case .localSourceControl(let path):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .localSourceControl)
-            try unkeyedContainer.encode(path)
-        case .remoteSourceControl(let url):
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .remoteSourceControl)
-            try unkeyedContainer.encode(url)
-        case .registry:
-            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .registry)
-            try unkeyedContainer.encode(self.isRoot)
-        }
-    }
-}
