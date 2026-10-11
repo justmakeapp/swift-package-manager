@@ -101,8 +101,8 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
     case fileSystem(FileSystem)
     case sourceControl(SourceControl)
     case registry(Registry)
-    
-    public struct FileSystem: Equatable, Hashable, Encodable, Sendable {
+
+    public struct FileSystem: Equatable, Hashable, Codable, Sendable {
         public let identity: PackageIdentity
         public let nameForTargetDependencyResolutionOnly: String?
         public let path: AbsolutePath
@@ -123,7 +123,7 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
         }
     }
 
-    public struct SourceControl: Equatable, Hashable, Encodable, Sendable {
+    public struct SourceControl: Equatable, Hashable, Codable, Sendable {
         public var identity: PackageIdentity {
             self.registryIdentity ?? self.canonicalIdentity
         }
@@ -169,6 +169,18 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
             self.registryIdentity = registryIdentity
         }
 
+        // swiftdeps: explicit decoder because `identity` is computed from `canonicalIdentity`.
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.canonicalIdentity = try container.decode(PackageIdentity.self, forKey: .identity)
+            self.nameForTargetDependencyResolutionOnly = try container.decodeIfPresent(String.self, forKey: .nameForTargetDependencyResolutionOnly)
+            self.location = try container.decode(Location.self, forKey: .location)
+            self.requirement = try container.decode(Requirement.self, forKey: .requirement)
+            self.productFilter = try container.decode(ProductFilter.self, forKey: .productFilter)
+            self.traits = try container.decodeIfPresent(Set<Trait>.self, forKey: .traits)
+            self.registryIdentity = try container.decodeIfPresent(PackageIdentity.self, forKey: .registryIdentity)
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(canonicalIdentity, forKey: .identity)
@@ -181,7 +193,7 @@ public enum PackageDependency: Equatable, Hashable, Sendable {
         }
     }
 
-    public struct Registry: Equatable, Hashable, Encodable, Sendable {
+    public struct Registry: Equatable, Hashable, Codable, Sendable {
         public let identity: PackageIdentity
         public let requirement: Requirement
         public let productFilter: ProductFilter
@@ -530,9 +542,33 @@ extension PackageDependency.Registry.Requirement: CustomStringConvertible {
     }
 }
 
-extension PackageDependency: Encodable {
+extension PackageDependency: Codable {
     private enum CodingKeys: String, CodingKey {
         case local, fileSystem, scm, sourceControl, registry
+    }
+
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .fileSystem) {
+            let settings = try unkeyedContainer.decode(PackageDependency.FileSystem.self)
+            self = .fileSystem(settings)
+            return
+        }
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .sourceControl) {
+            let settings = try unkeyedContainer.decode(PackageDependency.SourceControl.self)
+            self = .sourceControl(settings)
+            return
+        }
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .registry) {
+            let settings = try unkeyedContainer.decode(PackageDependency.Registry.self)
+            self = .registry(settings)
+            return
+        }
+
+        throw DecodingError.typeMismatch(Self.self, .init(codingPath: container.codingPath, debugDescription: "Cannot decode PackageDependency"))
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -551,9 +587,39 @@ extension PackageDependency: Encodable {
     }
 }
 
-extension PackageDependency.SourceControl.Requirement: Encodable {
+extension PackageDependency.SourceControl.Requirement: Codable {
     private enum CodingKeys: String, CodingKey {
         case exact, range, revision, branch
+    }
+
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .exact) {
+            let version = try unkeyedContainer.decode(Version.self)
+            self = .exact(version)
+            return
+        }
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .range) {
+            let range = try unkeyedContainer.decode(CodableRange<Version>.self)
+            self = .range(range.range)
+            return
+        }
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .revision) {
+            let revision = try unkeyedContainer.decode(String.self)
+            self = .revision(revision)
+            return
+        }
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .branch) {
+            let branch = try unkeyedContainer.decode(String.self)
+            self = .branch(branch)
+            return
+        }
+
+        throw DecodingError.typeMismatch(Self.self, .init(codingPath: container.codingPath, debugDescription: "Cannot decode PackageDependency.SourceControl"))
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -575,9 +641,27 @@ extension PackageDependency.SourceControl.Requirement: Encodable {
     }
 }
 
-extension PackageDependency.SourceControl.Location: Encodable {
+extension PackageDependency.SourceControl.Location: Codable {
     private enum CodingKeys: String, CodingKey {
         case local, remote
+    }
+
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .local) {
+            let path = try unkeyedContainer.decode(AbsolutePath.self)
+            self = .local(path)
+            return
+        }
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .remote) {
+            let url = try unkeyedContainer.decode(SourceControlURL.self)
+            self = .remote(url)
+            return
+        }
+
+        throw DecodingError.typeMismatch(Self.self, .init(codingPath: container.codingPath, debugDescription: "Cannot decode PackageDependency.SourceControl.Location"))
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -593,10 +677,29 @@ extension PackageDependency.SourceControl.Location: Encodable {
     }
 }
 
-extension PackageDependency.Registry.Requirement: Encodable {
+extension PackageDependency.Registry.Requirement: Codable {
     private enum CodingKeys: String, CodingKey {
         case exact, range
     }
+
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .exact) {
+            let version = try unkeyedContainer.decode(Version.self)
+            self = .exact(version)
+            return
+        }
+
+        if var unkeyedContainer = try? container.nestedUnkeyedContainer(forKey: .range) {
+            let range = try unkeyedContainer.decode(CodableRange<Version>.self)
+            self = .range(range.range)
+            return
+        }
+
+        throw DecodingError.typeMismatch(Self.self, .init(codingPath: container.codingPath, debugDescription: "Cannot decode PackageDependency.Registry.Requirement"))
+    }
+
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)

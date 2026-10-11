@@ -101,13 +101,13 @@ public class Workspace {
 
     /// The `Package.resolved` store. The `Package.resolved` file will be created when first resolved package is added
     /// to the store.
-    package let resolvedPackagesStore: LoadableResult<ResolvedPackagesStore>
+    public let resolvedPackagesStore: LoadableResult<ResolvedPackagesStore>
 
     ///  Computed enabled traits per package in the workspace
     public var enabledTraitsMap: EnabledTraitsMap = [:]
 
     /// The file system on which the workspace will operate.
-    package let fileSystem: any FileSystem
+    public let fileSystem: any FileSystem
 
     /// The host toolchain to use.
     let hostToolchain: UserToolchain
