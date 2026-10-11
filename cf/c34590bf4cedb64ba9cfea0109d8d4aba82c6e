@@ -1,0 +1,31 @@
+Sources/PackageGraph/ModulesGraph.swift
+  s_5244f572dbd640::t_a4b3f26209090d 22-23
+Sources/PackageGraph/Resolution/PubGrub/PubGrubDependencyResolver.swift
+  s_5244f572dbd640::t_428abcaf993e4a 865
+Sources/PackageModel/Manifest/PackageDependencyDescription.swift
+  s_5244f572dbd640::t_ce54cb059667a9 104-105,126,172-183,196,545,550-573,590,595-624,644,649-666,680,685-703
+Sources/PackageModel/Module/Module.swift
+  s_5244f572dbd640::t_80730b2dd284d7 23
+Sources/PackageModel/PackageReference.swift
+  s_5244f572dbd640::t_d248af48d1c042 21
+Sources/Workspace/Workspace+State.swift
+  s_5244f572dbd640::t_2a7d29ed246144 167-182
+Sources/Workspace/Workspace.swift
+  s_5244f572dbd640::t_dde63275e1196e 104,110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cfc34590bf4cedb64ba9cfea0109d8d4aba82c6e",
+  "prompts": {},
+  "sessions": {
+    "s_5244f572dbd640": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3ca614ae-ed10-4838-92c3-3bead74ad7de",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Bryan Nguyen <thanhbinh01234@gmail.com>"
+    }
+  }
+}
